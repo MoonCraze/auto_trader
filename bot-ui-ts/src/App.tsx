@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import CandlestickChart from './components/CandlestickChart';
 import TransactionFeed from './components/TransactionFeed';
 import Card from './components/Card';
-import { Candle, Portfolio, BotTrade, MarketTrade, StrategyState } from './types';
+import { Candle, Portfolio, BotTrade, MarketTrade, StrategyState, VolumeData } from './types';
 
 const StrategyPanel: React.FC<{ state: StrategyState | null }> = ({ state }) => {
     if (!state) return <p className="text-gray-500">Awaiting entry signal...</p>;
 
-    // <<< FIX: Add h-full and overflow-y-auto to make this panel scrollable
     return (
         <div className="h-full space-y-3 text-sm overflow-y-auto pr-2">
             <div>
@@ -37,13 +36,19 @@ const StrategyPanel: React.FC<{ state: StrategyState | null }> = ({ state }) => 
     );
 };
 
-// The main App component in src/App.tsx
 function App() {
-    // All state and WebSocket logic remains the same...
     const [isConnected, setIsConnected] = useState<boolean>(false);
     const [isFinished, setIsFinished] = useState<boolean>(false);
+    
+    // Candle states
     const [initialCandles, setInitialCandles] = useState<Candle[] | null>(null);
     const [lastCandle, setLastCandle] = useState<Candle | null>(null);
+    
+    // NEW: Volume states
+    const [initialVolume, setInitialVolume] = useState<VolumeData[] | null>(null);
+    const [lastVolume, setLastVolume] = useState<VolumeData | null>(null);
+    
+    // Other states remain the same
     const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
     const [strategyState, setStrategyState] = useState<StrategyState | null>(null);
     const [botTrades, setBotTrades] = useState<BotTrade[]>([]);
@@ -58,10 +63,12 @@ function App() {
             switch (message.type) {
                 case 'INITIAL_STATE':
                     setInitialCandles(message.data.candles);
+                    setInitialVolume(message.data.volumes);
                     setBotTrades(message.data.bot_trades);
                     break;
                 case 'UPDATE':
                     if (message.data.candle) setLastCandle(message.data.candle);
+                    if (message.data.volume) setLastVolume(message.data.volume);
                     if (message.data.portfolio) setPortfolio(message.data.portfolio);
                     if (message.data.strategy_state) setStrategyState(message.data.strategy_state);
                     if (message.data.bot_trade) {
@@ -134,11 +141,16 @@ function App() {
                 </div>
                 
                 <div className="flex-grow flex flex-col gap-4">
-                    {/* <<< FIX: Reduced chart height to 3/5 (60%) of the space */}
                     <div className="h-3/5 bg-gray-800/50 rounded-lg p-2">
-                         <CandlestickChart initialData={initialCandles} update={lastCandle} botTrades={botTrades} />
+                         <CandlestickChart 
+                            initialData={initialCandles} 
+                            initialVolume={initialVolume} 
+                            update={lastCandle}
+                            volumeUpdate={lastVolume}
+                            botTrades={botTrades}
+                            strategyState={strategyState} // <<< ADD THIS PROP
+                        />
                     </div>
-                     {/* <<< FIX: Increased panel height to 2/5 (40%) of the space */}
                     <div className="h-2/5 grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Card title="Strategy Brain">
                            <StrategyPanel state={strategyState}/>
