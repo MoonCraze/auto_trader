@@ -13,9 +13,8 @@ from strategy_engine import StrategyEngine
 from data_feeder import generate_synthetic_data
 from entry_strategy import check_for_entry_signal
 
-# --- WebSocket Server Setup (No changes here) ---
 CONNECTIONS = set()
-# ... (register and broadcast functions are correct from the previous version) ...
+
 async def register(websocket):
     """Registers a new UI connection."""
     CONNECTIONS.add(websocket)
@@ -137,7 +136,13 @@ async def run_bot_simulation():
     strategy = StrategyEngine(token_symbol, entry_price, tokens_bought)
     
     strategy_state = { 'entry_price': strategy.entry_price, 'stop_loss_price': strategy.stop_loss_price, 'take_profit_tiers': config.TAKE_PROFIT_TIERS }
-    bot_trade_event = { 'time': int(data_df.iloc[entry_index]['timestamp'].timestamp()), 'side': 'BUY', 'price': entry_price, 'sol_amount': sol_to_invest }
+    bot_trade_event = { 
+        'time': int(data_df.iloc[entry_index]['timestamp'].timestamp()), 
+        'side': 'BUY', 
+        'price': entry_price, 
+        'sol_amount': sol_to_invest,
+        'token_amount': tokens_bought
+    }
     serializable_positions = {k: v for k, v in pm.positions.items()}
     portfolio_status = {
         'sol_balance': pm.sol_balance,
@@ -158,7 +163,7 @@ async def run_bot_simulation():
 
     for index, row in data_df.iloc[entry_index + 1:].iterrows():
         await asyncio.sleep(0.05)
-        current_price = row['close'] # <<< FIX 2 (Again): Use `row['close']`
+        current_price = row['close']
         bot_trade_event = None
         if token_symbol in pm.positions:
             action, sell_portion, reason = strategy.check_for_trade_action(current_price)
@@ -168,7 +173,13 @@ async def run_bot_simulation():
                 tokens_to_sell = min(tokens_to_sell, remaining_tokens)
                 sol_received = executor.execute_sell(token_symbol, tokens_to_sell, current_price)
                 if sol_received > 0:
-                    bot_trade_event = { 'time': int(row['timestamp'].timestamp()), 'side': 'SELL', 'price': current_price, 'sol_amount': sol_received }
+                    bot_trade_event = { 
+                        'time': int(row['timestamp'].timestamp()), 
+                        'side': 'SELL', 
+                        'price': current_price, 
+                        'sol_amount': sol_received,
+                        'token_amount': tokens_to_sell
+                    }
         
         market_trade_event = None
         if random.random() > 0.6:
