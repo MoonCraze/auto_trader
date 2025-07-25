@@ -18,4 +18,4 @@ TRAILING_STOP_LOSS_PERCENT = 0.20  # Trail 20% below the highest price reached
 SIM_INITIAL_PRICE = 0.01
 SIM_DRIFT = 0.001       # Positive drift to simulate a general uptrend
 SIM_VOLATILITY = 0.02   # Volatility to create price fluctuations
-SIM_TIME_STEPS = 500    # Number of price updates in our simulation
+SIM_TIME_STEPS = 1000    # Number of price updates in our simulation
