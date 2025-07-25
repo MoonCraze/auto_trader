@@ -45,3 +45,9 @@ export interface StrategyState {
     stop_loss_price: number;
     take_profit_tiers: [number, number][]; // Array of tuples [target_percent, sell_portion]
 }
+
+export interface VolumeData {
+  time: Time;
+  value: number;
+  color: string;
+}
