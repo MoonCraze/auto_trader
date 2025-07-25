@@ -130,10 +130,19 @@ function App() {
                     <Card title="Bot Trade Log" className="flex-grow">
                         <ul className="space-y-2 overflow-y-auto pr-2 h-full">
                              {botTrades.map((trade, index) => (
-                                 <li key={index} className="text-sm p-1.5 rounded bg-blue-900/50">
-                                    <span className={trade.side === 'BUY' ? 'text-blue-400' : 'text-red-400'}>{trade.side} </span>
-                                    <span className="text-gray-300">{trade.sol_amount.toFixed(4)} SOL </span>
-                                    <span className="text-gray-400">@ {trade.price.toFixed(6)}</span>
+                                 <li key={index} className="text-sm p-2 rounded bg-gray-700/50">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className={`font-semibold ${trade.side === 'BUY' ? 'text-blue-400' : 'text-red-400'}`}>
+                                            {trade.side}
+                                        </span>
+                                        <span className="text-gray-400 font-mono">
+                                            @ {trade.price.toFixed(6)}
+                                        </span>
+                                    </div>
+                                    <div className="text-white font-mono text-right">
+                                        {trade.token_amount.toFixed(2)} MOG 
+                                        <span className="text-gray-500"> ({trade.sol_amount.toFixed(4)} SOL)</span>
+                                    </div>
                                  </li>
                              ))}
                         </ul>
