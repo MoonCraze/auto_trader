@@ -47,3 +47,9 @@ export interface VolumeData {
   value: number;
   color: string;
 }
+
+export interface TradeSummary {
+  token: string;
+  status: 'Pending' | 'Monitoring' | 'Active' | 'Finished';
+  pnl: number;
+}
