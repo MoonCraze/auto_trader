@@ -5,38 +5,46 @@ import random
 
 def generate_synthetic_data(initial_price, drift, volatility, time_steps):
     """
-    Generates synthetic cryptocurrency price data using Geometric Brownian Motion.
-
-    Args:
-        initial_price (float): The starting price of the token.
-        drift (float): The long-term trend (e.g., 0.001 for a slight uptrend).
-        volatility (float): The randomness or daily price fluctuation (e.g., 0.02).
-        time_steps (int): The number of price points to generate.
-
-    Returns:
-        pandas.DataFrame: A DataFrame with 'timestamp' and 'price' columns.
+    Generates realistic synthetic OHLCV data for candlestick charts.
     """
+    # 1. Generate a series of close prices using Geometric Brownian Motion
     shocks = np.random.normal(loc=drift, scale=volatility, size=time_steps)
-    prices = initial_price * np.exp(np.cumsum(shocks))
-    timestamps = pd.to_datetime(pd.date_range(start='2023-01-01', periods=time_steps, freq='1min'))
+    close_prices = initial_price * np.exp(np.cumsum(shocks))
     
-    transactions = []
-    for price in prices:
-        if random.random() > 0.7: # 30% chance of a transaction at each price tick
-            tx = {
-                'type': 'BUY' if random.random() > 0.5 else 'SELL',
-                'sol_amount': round(random.uniform(0.1, 2.0), 4),
-                'price': round(price, 6)
-            }
-            transactions.append(tx)
+    # 2. Build OHLCV data from the close prices
+    ohlcv = []
+    for i in range(len(close_prices)):
+        if i == 0:
+            open_price = initial_price
         else:
-            transactions.append(None)
+            # The open of this candle is the close of the last one
+            open_price = ohlcv[i-1]['close']
 
-    df = pd.DataFrame({
-        'timestamp': timestamps,
-        'price': prices,
-        'transaction': transactions # Add new column
-    })
+        close_price = close_prices[i]
+
+        # Create realistic wicks
+        high_price = max(open_price, close_price) * random.uniform(1, 1.015)
+        low_price = min(open_price, close_price) * random.uniform(0.985, 1)
+        
+        # Ensure open/close are within high/low
+        high_price = max(high_price, open_price, close_price)
+        low_price = min(low_price, open_price, close_price)
+
+        # Generate some volume
+        volume = random.randint(1000, 20000)
+
+        ohlcv.append({
+            'open': open_price,
+            'high': high_price,
+            'low': low_price,
+            'close': close_price,
+            'volume': volume
+        })
+
+    # 3. Create the final DataFrame
+    timestamps = pd.to_datetime(pd.date_range(start='2023-01-01', periods=time_steps, freq='5min'))
+    df = pd.DataFrame(ohlcv)
+    df['timestamp'] = timestamps
     
     return df
 
@@ -56,7 +64,7 @@ if __name__ == '__main__':
         initial_price=0.01, 
         drift=0.001, 
         volatility=0.02, 
-        time_steps=100
+        time_steps=200
     )
     
     print("Generated Data Head:")
