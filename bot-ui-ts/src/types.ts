@@ -32,7 +32,8 @@ export interface Position {
 export interface Portfolio {
     sol_balance: number;
     total_value: number;
-    pnl: number;
+    trade_pnl: number;
+    overall_pnl: number;
     positions: Record<string, Position>;
 }
 
