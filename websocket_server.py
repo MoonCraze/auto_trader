@@ -12,7 +12,7 @@ from strategy_engine import StrategyEngine
 from data_feeder import generate_synthetic_data
 from entry_strategy import check_for_entry_signal
 
-# This global dictionary is the single source of truth for the application's state.
+# This global dictionary is the single source of truth for the application's state.11
 APP_STATE = { "trade_summaries": [], "active_token_symbol": None, "initial_candles": [], "initial_volumes": [], "bot_trades": [], "strategy_state": None, "portfolio": None, }
 CONNECTIONS = set()
 
@@ -72,14 +72,26 @@ async def process_single_token(token_symbol, pm, index):
     # 2. Atomically update the global state with the initial historical data.
     APP_STATE.update({
         "active_token_symbol": token_symbol,
-        "initial_candles": initial_candles, "initial_volumes": initial_volumes,
-        "bot_trades": [], "strategy_state": None, "portfolio": None,
+        "initial_candles": initial_candles,
+        "initial_volumes": initial_volumes,
+        "bot_trades": [], 
+        "strategy_state": None, 
+        "portfolio": None,
     })
     
     # 3. Notify the UI about the new trade. It will draw the initial historical chart.
     APP_STATE["trade_summaries"][index]['status'] = 'Monitoring'
     await broadcast(json.dumps({'type': 'TRADE_SUMMARY_UPDATE', 'data': {'summaries': APP_STATE["trade_summaries"]}}))
-    new_trade_package = { 'type': 'NEW_TRADE_STARTING', 'data': { 'token_symbol': token_symbol, 'candles': initial_candles, 'volumes': initial_volumes, } }
+    new_trade_package = {
+        'type': 'NEW_TRADE_STARTING',
+        'data': {
+            'token_symbol': token_symbol,
+            'candles': initial_candles,
+            'volumes': initial_volumes,
+            'bot_trades': [],          
+            'strategy_state': None,
+        }
+    }
     await broadcast(json.dumps(new_trade_package))
     await asyncio.sleep(2)
 
@@ -120,7 +132,13 @@ async def process_single_token(token_symbol, pm, index):
     
     APP_STATE["bot_trades"].append({'time': int(data_df.iloc[entry_index]['timestamp'].timestamp()), 'side': 'BUY', 'price': entry_price, 'sol_amount': sol_to_invest, 'token_amount': tokens_bought})
     APP_STATE["strategy_state"] = {'entry_price': strategy.entry_price, 'stop_loss_price': strategy.stop_loss_price, 'take_profit_tiers': config.TAKE_PROFIT_TIERS}
-    APP_STATE["portfolio"] = {'sol_balance': pm.sol_balance, 'positions': {k: v for k, v in pm.positions.items()}, 'total_value': pm.get_total_value({token_symbol: entry_price}), 'pnl': pm.get_total_value({token_symbol: entry_price}) - initial_sol_balance}
+    APP_STATE["portfolio"] = {
+        'sol_balance': pm.sol_balance, 
+        'positions': {k: v for k, v in pm.positions.items()}, 
+        'total_value': pm.get_total_value({token_symbol: entry_price}), 
+        'trade_pnl': pm.get_total_value({token_symbol: entry_price}) - initial_sol_balance, # Rename pnl -> trade_pnl
+        'overall_pnl': pm.get_total_value({token_symbol: entry_price}) - config.INITIAL_CAPITAL_SOL # <<< ADD THIS
+    }
     APP_STATE["trade_summaries"][index]['status'] = 'Active'
 
     first_update = {'type': 'UPDATE', 'data': {'bot_trade': APP_STATE["bot_trades"][-1], 'strategy_state': APP_STATE["strategy_state"], 'portfolio': APP_STATE["portfolio"]}}
@@ -143,8 +161,13 @@ async def process_single_token(token_symbol, pm, index):
                     APP_STATE["bot_trades"].append(bot_trade_event)
         
         APP_STATE["strategy_state"]['stop_loss_price'] = strategy.stop_loss_price
-        APP_STATE["portfolio"] = {'sol_balance': pm.sol_balance, 'positions': {k: v for k, v in pm.positions.items()}, 'total_value': pm.get_total_value({token_symbol: current_price}), 'pnl': pm.get_total_value({token_symbol: current_price}) - initial_sol_balance}
-        
+        APP_STATE["portfolio"] = {
+            'sol_balance': pm.sol_balance, 
+            'positions': {k: v for k, v in pm.positions.items()}, 
+            'total_value': pm.get_total_value({token_symbol: current_price}), 
+            'trade_pnl': pm.get_total_value({token_symbol: current_price}) - initial_sol_balance, # Rename pnl -> trade_pnl
+            'overall_pnl': pm.get_total_value({token_symbol: current_price}) - config.INITIAL_CAPITAL_SOL # <<< ADD THIS
+        }
         market_trade = {'side': 'BUY' if random.random() > 0.5 else 'SELL', 'sol_amount': round(random.uniform(0.05, 1.5), 4), 'price': round(current_price, 6), 'timestamp': datetime.now(timezone.utc).isoformat()} if random.random() > 0.6 else None
         candle, volume = format_candle_and_volume(row)
         update_message = {'type': 'UPDATE', 'data': {'candle': candle, 'volume': volume, 'portfolio': APP_STATE["portfolio"], 'strategy_state': APP_STATE["strategy_state"], 'bot_trade': bot_trade_event, 'market_trade': market_trade}}
