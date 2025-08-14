@@ -49,8 +49,13 @@ export interface VolumeData {
   color: string;
 }
 
+export interface TokenInfo {
+    address: string;
+    symbol: string;
+}
+
 export interface TradeSummary {
-  token: string;
+  token: TokenInfo;
   status: 'Pending' | 'Monitoring' | 'Active' | 'Finished';
   pnl: number;
 }
