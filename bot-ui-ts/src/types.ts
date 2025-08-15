@@ -37,12 +37,6 @@ export interface Portfolio {
     positions: Record<string, Position>;
 }
 
-export interface StrategyState {
-    entry_price: number;
-    stop_loss_price: number;
-    take_profit_tiers: [number, number][];
-}
-
 export interface VolumeData {
   time: Time;
   value: number;
@@ -56,6 +50,15 @@ export interface TokenInfo {
 
 export interface TradeSummary {
   token: TokenInfo;
-  status: 'Pending' | 'Monitoring' | 'Active' | 'Finished';
+  status: 'Pending' | 'Screening' | 'Monitoring' | 'Active' | 'Finished' | 'Failed';
   pnl: number;
+  sentiment_score: number | null;
+  mention_count: number | null;
+}
+
+export interface StrategyState {
+    entry_price: number;
+    stop_loss_price: number;
+    take_profit_tiers: [number, number][];
+    highest_price_seen: number;
 }
