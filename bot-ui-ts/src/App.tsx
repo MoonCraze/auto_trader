@@ -5,25 +5,53 @@ import Card from './components/Card';
 import TradeSummaryPanel from './components/TradeSummaryPanel';
 import { Candle, Portfolio, BotTrade, MarketTrade, StrategyState, VolumeData, TradeSummary, TokenInfo } from './types';
 
-// The StrategyPanel component is correct and does not need changes.
-const StrategyPanel: React.FC<{ state: StrategyState | null }> = ({ state }) => {
+const StrategyPanel: React.FC<{ state: StrategyState | null; currentPrice: number }> = ({ state, currentPrice }) => {
     if (!state) return <p className="text-gray-500">Awaiting entry signal...</p>;
 
+    const drawdown = state.highest_price_seen > 0 ? ((state.highest_price_seen - currentPrice) / state.highest_price_seen) * 100 : 0;
+
     return (
-        <div className="h-full space-y-3 text-sm overflow-y-auto pr-2">
-            <div><span className="text-gray-400">Entry Price: </span><span className="font-mono text-white">{state.entry_price.toFixed(6)}</span></div>
-            <div><span className="text-gray-400">Stop-Loss: </span><span className="font-mono text-yellow-400">{state.stop_loss_price.toFixed(6)}</span></div>
-            <div>
-                <p className="text-gray-400 mb-1">Take-Profit Targets:</p>
-                <ul className="space-y-1">
-                    {state.take_profit_tiers.map(([target, portion], i) => (
-                        <li key={`tp-${i}`} className="text-gray-300">- Sell {portion * 100}% at <span className="font-mono text-green-400">{(state.entry_price * (1 + target)).toFixed(6)}</span></li>
-                    ))}
-                </ul>
+        <div className="h-full grid grid-cols-2 gap-x-6 text-sm">
+            {/* --- Column 1: Trade Plan --- */}
+            <div className="space-y-3">
+                <p className="text-gray-400 font-semibold mb-2 border-b border-gray-700/50 pb-1">Trade Plan</p>
+                <div className="flex justify-between">
+                    <span className="text-gray-400">Entry Price:</span>
+                    <span className="font-mono text-white">{state.entry_price.toFixed(6)}</span>
+                </div>
+                <div className="flex justify-between">
+                    <span className="text-gray-400">Stop-Loss:</span>
+                    <span className="font-mono text-yellow-400">{state.stop_loss_price.toFixed(6)}</span>
+                </div>
+                <div className="pt-1">
+                    <p className="text-gray-400 mb-1">Take-Profit Targets:</p>
+                    <ul className="space-y-1">
+                        {state.take_profit_tiers.map(([target, portion], i) => (
+                            <li key={`tp-${i}`} className="flex justify-between text-gray-300">
+                                <span>- Sell {portion * 100}%</span>
+                                <span className="font-mono text-green-400">{(state.entry_price * (1 + target)).toFixed(6)}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+
+            {/* --- Column 2: Live Analysis --- */}
+            <div className="space-y-3 border-l border-gray-700/50 pl-6">
+                 <p className="text-gray-400 font-semibold mb-2 border-b border-gray-700/50 pb-1">Live Analysis</p>
+                 <div className="flex justify-between">
+                    <span className="text-gray-400">Peak Price:</span>
+                    <span className="font-mono text-cyan-400">{state.highest_price_seen.toFixed(6)}</span>
+                 </div>
+                 <div className="flex justify-between">
+                    <span className="text-gray-400">Drawdown:</span>
+                    <span className={`font-mono ${drawdown > 0 ? 'text-red-400' : 'text-gray-400'}`}>{drawdown.toFixed(2)}%</span>
+                 </div>
             </div>
         </div>
     );
 };
+
 
 function App() {
     // All state and WebSocket logic is correct and does not need changes.
@@ -41,7 +69,8 @@ function App() {
     const initialCapital = 50.0;
 
     useEffect(() => {
-        const ws = new WebSocket('wss://legendary-tribble-v6vgw754rrphp4rj-8765.app.github.dev');
+        // Use your production WebSocket URL here
+        const ws = new WebSocket('wss://legendary-tribble-v6vgw754rrrphp4rj-8765.app.github.dev');
         ws.onopen = () => setIsConnected(true);
         ws.onclose = () => setIsConnected(false);
         ws.onmessage = (event) => {
@@ -118,10 +147,7 @@ function App() {
                 </div>
             </header>
 
-            {/* <<< THE DEFINITIVE FIX IS IN THE JSX STRUCTURE BELOW --- */}
             <main className="flex-grow flex flex-row gap-4 overflow-hidden">
-                
-                {/* --- COLUMN 1: The Complete Sidebar --- */}
                 <div className="flex flex-col gap-4 w-full max-w-xs">
                     <Card title="Overall Performance">
                         <div className="space-y-2 text-sm">
@@ -136,9 +162,7 @@ function App() {
                     </Card>
                 </div>
                 
-                {/* --- COLUMN 2: The Main Content Area --- */}
                 <div className="flex-grow flex flex-col gap-4">
-                    {/* ROW 1: Chart and Active Trade Info */}
                     <div className="h-3/5 grid grid-cols-1 lg:grid-cols-4 gap-4">
                         <div className="lg:col-span-1 flex flex-col gap-4">
                             <Card title="Current Position">
@@ -175,10 +199,9 @@ function App() {
                             />
                         </div>
                     </div>
-                    {/* ROW 2: Strategy and Market Info */}
                     <div className="h-2/5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card title="Strategy Brain">
-                           <StrategyPanel state={strategyState}/>
+                        <Card title="Live Trade Analysis">
+                           <StrategyPanel state={strategyState} currentPrice={currentPrice} />
                         </Card>
                         <Card title="Live Transactions">
                            <TransactionFeed trades={marketTrades} />
