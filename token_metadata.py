@@ -20,8 +20,24 @@ class TokenMetadata:
                         print(f"Successfully loaded metadata for {len(self.token_map)} tokens.")
                     else:
                         print(f"Failed to fetch token list. Status: {response.status}")
+                        self._use_fallback_data()
         except Exception as e:
             print(f"An error occurred while fetching token metadata: {e}")
+            self._use_fallback_data()
+            
+    def _use_fallback_data(self):
+        """Use hardcoded fallback data when online fetch fails"""
+        print("Using fallback token metadata...")
+        self.token_map = {
+            "8eye7ykjbjfcucrv3d3tgsd7f2ngujackvsf9ka8efwv": "goldcoin",
+            "c3xe6hm8obq9ynkndpwzkysbt1pdnk2mi2to8bhykwx3": "Uni",
+            "emelmjivmebilddtqzkp63mfue1u55ycyr4kkwkxk7gd": "fraudcoin",
+            "dctvr8kcsr3da4fqxbpdheh87rw7y2t34u8yafww2scp": "MeowChi",
+            "5bns2je5vrmvtyqa7x8psyfarja8plfybla5pjgkuyz9": "XAU",
+            "hnxndek9suxvn12urquccxc267bwm1n472dhcvjmj35": "LION",
+            "384jaovaa3qvwdu9e9axjdyh5v1zlfpgjqcwzxewlnq7": "POLYTREND"
+        }
+        print(f"Loaded {len(self.token_map)} fallback tokens.")
 
     def get_symbol(self, address: str) -> str:
         """Returns the symbol for a given address, or a truncated address if not found."""

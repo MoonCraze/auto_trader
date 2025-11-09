@@ -1,78 +1,56 @@
-import numpy as np
 import pandas as pd
 import asyncio
-import random 
+from geckoterminal_client import GeckoTerminalClient
 
-def generate_synthetic_data(initial_price, drift, volatility, time_steps):
+async def get_historical_data(pool_address: str, network: str = 'solana') -> pd.DataFrame:
     """
-    Generates realistic synthetic OHLCV data for candlestick charts.
+    Fetches historical OHLCV data from GeckoTerminal.
+    
+    Args:
+        pool_address: The pool address to fetch data for
+        network: The network (default: 'solana')
+    
+    Returns:
+        DataFrame with OHLCV data
     """
-    # 1. Generate a series of close prices using Geometric Brownian Motion
-    shocks = np.random.normal(loc=drift, scale=volatility, size=time_steps)
-    close_prices = initial_price * np.exp(np.cumsum(shocks))
-    
-    # 2. Build OHLCV data from the close prices
-    ohlcv = []
-    for i in range(len(close_prices)):
-        if i == 0:
-            open_price = initial_price
-        else:
-            # The open of this candle is the close of the last one
-            open_price = ohlcv[i-1]['close']
-
-        close_price = close_prices[i]
-
-        # Create realistic wicks
-        high_price = max(open_price, close_price) * random.uniform(1, 1.015)
-        low_price = min(open_price, close_price) * random.uniform(0.985, 1)
-        
-        # Ensure open/close are within high/low
-        high_price = max(high_price, open_price, close_price)
-        low_price = min(low_price, open_price, close_price)
-
-        # Generate some volume
-        volume = random.randint(1000, 20000)
-
-        ohlcv.append({
-            'open': open_price,
-            'high': high_price,
-            'low': low_price,
-            'close': close_price,
-            'volume': volume
-        })
-
-    # 3. Create the final DataFrame
-    timestamps = pd.to_datetime(pd.date_range(start='2023-01-01', periods=time_steps, freq='5min'))
-    df = pd.DataFrame(ohlcv)
-    df['timestamp'] = timestamps
-    
+    client = GeckoTerminalClient()
+    df = await client.get_ohlcv(network, pool_address)
+    if df is None:
+        raise ValueError(f"Failed to fetch data for pool {pool_address}")
     return df
 
-async def stream_data(data_df):
+async def stream_data(pool_address: str, network: str = 'solana'):
     """
-    An asynchronous generator that yields data points one by one,
-    simulating a real-time data feed.
+    An asynchronous generator that yields real-time data points from GeckoTerminal.
+    
+    Args:
+        pool_address: The pool address to stream data for
+        network: The network (default: 'solana')
     """
-    for index, row in data_df.iterrows():
-        yield row
-        await asyncio.sleep(0.05) # This will now work correctly
+    client = GeckoTerminalClient()
+    while True:
+        try:
+            latest = await client.get_latest_candle(network, pool_address)
+            if latest:
+                yield latest
+            # Wait for 5 minutes before next update (GeckoTerminal data is in 5-min candles)
+            await asyncio.sleep(300)
+        except Exception as e:
+            print(f"Error streaming data: {e}")
+            await asyncio.sleep(5)  # Short delay on error before retry
 
 # This part is for standalone testing of this file
 if __name__ == '__main__':
-    # Generate some sample data
-    test_data = generate_synthetic_data(
-        initial_price=0.01, 
-        drift=0.001, 
-        volatility=0.02, 
-        time_steps=200
-    )
-    
-    print("Generated Data Head:")
-    print(test_data.head())
-    print("\n--- Simulating Stream ---")
+    async def test():
+        # Test historical data
+        pool_address = 'DCTvr8KcsR3Da4fQXbPdhEH87rW7y2T34U8YAFww2sCp'
+        print("Fetching historical data...")
+        df = await get_historical_data(pool_address)
+        print("\nHistorical Data Head:")
+        print(df.head())
+        
+        print("\n--- Starting Live Stream ---")
+        async for candle in stream_data(pool_address):
+            print(f"Time: {candle['timestamp']}, Close: {candle['close']:.6f}, Volume: {candle['volume']:.2f}")
 
-    async def run_test_stream():
-        async for price_update in stream_data(test_data):
-            print(f"Time: {price_update['timestamp'].time()}, Price: {price_update['price']:.6f}")
-    
-    asyncio.run(run_test_stream())
+    asyncio.run(test())
