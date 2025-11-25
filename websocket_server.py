@@ -14,10 +14,11 @@ from entry_strategy import check_for_entry_signal
 from token_metadata import TokenMetadata
 from sentiment_analyzer import check_sentiment
 
-SSE_ENDPOINT = "https://legendary-tribble-v6vgw754rrrphp4rj-5000.app.github.dev/stream"
+SSE_ENDPOINT = "https://effective-dollop-4665p97wrjqfq79w-5000.app.github.dev/stream"
 
 APP_STATE = { "trade_summaries": [], "active_token_info": None, "initial_candles": [], "initial_volumes": [], "bot_trades": [], "strategy_state": None, "portfolio": None, "market_index_history": [] }
 CONNECTIONS = set()
+PROCESSED_TOKENS = set()  # Track tokens that have been processed to avoid duplicates
 
 async def register(websocket):
     CONNECTIONS.add(websocket)
@@ -69,12 +70,8 @@ async def process_single_token(token_info, pm, index):
         return
 
     print(f"[{token_info['symbol']}] Entry signal found at index {entry_index}. Going live.")
-    historical_df = data_df.iloc[:entry_index + 1]
+    # Remove historical data - start fresh from entry point
     initial_candles, initial_volumes = [], []
-    for _, row in historical_df.iterrows():
-        candle, volume = format_candle_and_volume(row)
-        initial_candles.append(candle)
-        initial_volumes.append(volume)
     sol_to_invest = pm.sol_balance * config.RISK_PER_TRADE_PERCENT
     tokens_bought = executor.execute_buy(token_info, sol_to_invest, entry_price)
     strategy = StrategyEngine(token_info, entry_price, tokens_bought)
@@ -89,7 +86,7 @@ async def process_single_token(token_info, pm, index):
     await asyncio.sleep(2)
 
     for i, row in data_df.iloc[entry_index + 1:].iterrows():
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(1)
         current_price = row['close']
         bot_trade_event = None
         if token_info['address'] in pm.positions:
@@ -133,8 +130,14 @@ async def listen_for_tokens(raw_queue: asyncio.Queue, metadata: TokenMetadata):
                                 data = json.loads(line[len('data:'):].strip())
                                 token_address = data.get("tokenAddress")
                                 if token_address:
+                                    # Check if token has already been processed
+                                    if token_address in PROCESSED_TOKENS:
+                                        print(f"Token {token_address} already processed. Skipping duplicate signal.")
+                                        continue
+                                    
                                     symbol = metadata.get_symbol(token_address)
                                     token_info = {"address": token_address, "symbol": symbol}
+                                    PROCESSED_TOKENS.add(token_address)
                                     print(f"Raw signal received for {symbol}. Pushing to screening queue.")
                                     await raw_queue.put(token_info)
                             except json.JSONDecodeError: pass
