@@ -70,7 +70,7 @@ function App() {
 
     useEffect(() => {
         // Use your production WebSocket URL here
-        const ws = new WebSocket('wss://legendary-tribble-v6vgw754rrrphp4rj-8765.app.github.dev');
+        const ws = new WebSocket('wss://effective-dollop-4665p97wrjqfq79w-8765.app.github.dev');
         ws.onopen = () => setIsConnected(true);
         ws.onclose = () => setIsConnected(false);
         ws.onmessage = (event) => {

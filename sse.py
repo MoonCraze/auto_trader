@@ -12,15 +12,7 @@ app = Flask(__name__)
 # --- Start of Modification ---
 
 # Pool of token addresses to be used
-tokens = [
-    "bFvxbbwXpCUdiqVEBQ3pKFudHtyfheJBdS7pHXMpump",
-    "32nNtYR8h8rRBKv8JQd2PM1XroBh8rQica5JWmgpBAGS",
-    "5u4dCN2hRA5Q568b9n5LTrrk7PG2jsqLocSySseLpump",
-    "C19J3fcXX9otmTjPuGNdZMQdfRG6SRhbnJv8EJnRpump",
-    "NJxAmP4tJZyRVaU5i2jG2ZmfguXzDjCQ67ZqRyBh111",
-    "KGKVAFPmo8SgXuvH4Yn5EMqZvk5Ku61XDSrJAe2pump",
-    "w6iohhdC6zbq2DP1uwtmvXPJibbFroDnni1A222bonk",
-]
+tokens =["HbWx3KDXQ1wPT4Kfr2jhfYDc6NcQdh9NBkCqdn7Ppump","5xL15htnLsMN44DyUQyztEYSFBn6pgF41cngBkKMpump","A72swFHbCgxEsEGKn2t3cA4nxnkFQDc3QBXcjX81pump","USCRdwZP5UkKhJzhWuD7XjTUviHBtZJbLG7XpbKng9S","2R5awbjoGYhzdXU5gErRtAQK3hyKmRfnJBeJeVvMpump","CTkPYPMrehsREdzn2dBMCwNxbP9ExrEnoQHMgswYpump","HJBoRECiJddTZQZpuY8pHenf5CZ2yjju4npekmvbpump","GFJbQ7WDQry73iTaGkJcXKjvi1ViFTFmHSENgz92jFPP","CpqEUjzrco1eu4Te9JQk7iNtL9EQCGFRLrjYBN6zpump","Eg2ymQ2aQqjMcibnmTt8erC6Tvk9PVpJZCxvVPJz2agu","DKAN3tyxnvgUrgGHAHsorBGgVGDVt9uEiRUybHrs77P3",]
 
 # --- End of Modification ---
 
