@@ -38,15 +38,15 @@ const StrategyPanel: React.FC<{ state: StrategyState | null; currentPrice: numbe
 
             {/* --- Column 2: Live Analysis --- */}
             <div className="space-y-3 border-l border-gray-700/50 pl-6">
-                 <p className="text-gray-400 font-semibold mb-2 border-b border-gray-700/50 pb-1">Live Analysis</p>
-                 <div className="flex justify-between">
+                <p className="text-gray-400 font-semibold mb-2 border-b border-gray-700/50 pb-1">Live Analysis</p>
+                <div className="flex justify-between">
                     <span className="text-gray-400">Peak Price:</span>
                     <span className="font-mono text-cyan-400">{state.highest_price_seen.toFixed(6)}</span>
-                 </div>
-                 <div className="flex justify-between">
+                </div>
+                <div className="flex justify-between">
                     <span className="text-gray-400">Drawdown:</span>
                     <span className={`font-mono ${drawdown > 0 ? 'text-red-400' : 'text-gray-400'}`}>{drawdown.toFixed(2)}%</span>
-                 </div>
+                </div>
             </div>
         </div>
     );
@@ -70,7 +70,7 @@ function App() {
 
     useEffect(() => {
         // Use your production WebSocket URL here
-        const ws = new WebSocket('wss://effective-dollop-4665p97wrjqfq79w-8765.app.github.dev');
+        const ws = new WebSocket('ws://localhost:8765');
         ws.onopen = () => setIsConnected(true);
         ws.onclose = () => setIsConnected(false);
         ws.onmessage = (event) => {
@@ -124,7 +124,7 @@ function App() {
     return (
         <div className="bg-gray-900 text-white h-screen font-sans flex flex-col p-4">
             <header className="flex-shrink-0 flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
-                 <div>
+                <div>
                     <h1 className="text-2xl font-bold">{activeSymbol} / SOL</h1>
                     <p className="text-sm text-gray-400">Autonomous Trading Bot - Mission Control</p>
                 </div>
@@ -158,10 +158,10 @@ function App() {
                         </div>
                     </Card>
                     <Card title="Trade Queue" className="flex-grow min-h-0">
-                       <TradeSummaryPanel summaries={tradeSummaries} activeTokenAddress={activeAddress} />
+                        <TradeSummaryPanel summaries={tradeSummaries} activeTokenAddress={activeAddress} />
                     </Card>
                 </div>
-                
+
                 <div className="flex-grow flex flex-col gap-4">
                     <div className="h-3/5 grid grid-cols-1 lg:grid-cols-4 gap-4">
                         <div className="lg:col-span-1 flex flex-col gap-4">
@@ -188,23 +188,23 @@ function App() {
                             </Card>
                         </div>
                         <div className="lg:col-span-3 bg-gray-800/50 rounded-lg p-2">
-                             <CandlestickChart 
-                                key={activeAddress || 'market-index'} 
-                                initialData={initialCandles} 
-                                initialVolume={initialVolume} 
+                            <CandlestickChart
+                                key={activeAddress || 'market-index'}
+                                initialData={initialCandles}
+                                initialVolume={initialVolume}
                                 update={lastCandle}
                                 volumeUpdate={lastVolume}
-                                botTrades={botTrades} 
+                                botTrades={botTrades}
                                 strategyState={strategyState}
                             />
                         </div>
                     </div>
                     <div className="h-2/5 grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Card title="Live Trade Analysis">
-                           <StrategyPanel state={strategyState} currentPrice={currentPrice} />
+                            <StrategyPanel state={strategyState} currentPrice={currentPrice} />
                         </Card>
                         <Card title="Live Transactions">
-                           <TransactionFeed trades={marketTrades} />
+                            <TransactionFeed trades={marketTrades} />
                         </Card>
                     </div>
                 </div>

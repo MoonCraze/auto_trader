@@ -2,7 +2,8 @@ import aiohttp
 import asyncio
 
 
-SENTIMENT_ENDPOINT_URL = "https://solid-space-journey-j6g4p7vg5pv3j655-8080.app.github.dev/rag/explain"
+SENTIMENT_ENDPOINT_URL = "https://aryan-spectrochemical-transperitoneally.ngrok-free.dev/rag/explain"
+TOKEN_INFO_ENDPOINT = "https://psychic-train-69grw7p65wjjc4vxr-5000.app.github.dev/token"
 MAX_RETRIES = 3
 INITIAL_RETRY_DELAY = 5
 
@@ -19,10 +20,26 @@ async def check_sentiment(token_address: str, token_symbol: str = None) -> dict 
         A dictionary like {'score': 75, 'mentions': 50} on success, or None on failure.
     """
     display_name = token_symbol or token_address[:8] + "..."
-    params = {'coin': token_address, 'max_results': 300}
+    
+    # First, fetch the token symbol from the token info endpoint
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{TOKEN_INFO_ENDPOINT}/{token_address}", timeout=10) as response:
+                if response.status == 200:
+                    token_data = await response.json()
+                    token_name = token_data.get('symbol', "AWE_NAAAA")
+                    print(f"[{display_name}] Resolved token name: {token_name.split()[0]}")
+                else:
+                    print(f"[{display_name}] Failed to fetch token info, using address instead.")
+                    token_name = token_address
+    except Exception as e:
+        print(f"[{display_name}] Error fetching token info: {e}, using address instead.")
+        token_name = "AWE_NAAAA"
+    
+    params = {'coin': "$"+token_name, 'max_results': 300}
     
     for attempt in range(MAX_RETRIES):
-        print(f"[{display_name}] Checking sentiment (Attempt {attempt + 1}/{MAX_RETRIES})...")
+        print(f"[{token_name}] Checking sentiment (Attempt {attempt + 1}/{MAX_RETRIES})...")
         
         try:
             async with aiohttp.ClientSession() as session:
@@ -69,6 +86,7 @@ async def check_sentiment(token_address: str, token_symbol: str = None) -> dict 
                             "mentions": total_mentions,
                             "confidence": confidence,
                             "evidence": evidence,
+                            "token_name": token_name,  # Include resolved token name
                             "raw_data": data  # Include full response for debugging
                         }
                     else:
