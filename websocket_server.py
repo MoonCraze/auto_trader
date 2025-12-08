@@ -345,8 +345,8 @@ async def process_sentiment_queue(raw_queue: asyncio.Queue, trade_queue: asyncio
             APP_STATE["processed_tokens"].add(token_info['address'])
             await broadcast_to_user(wallet_address, json.dumps({'type': 'TRADE_SUMMARY_UPDATE', 'data': {'summaries': APP_STATE["trade_summaries"]}}))
         
-        # sentiment_result = await check_sentiment(token_info['address'], token_info['symbol'])
-        sentiment_result = {'score': 75, 'mentions': 50}
+        sentiment_result = await check_sentiment(token_info['address'], token_info['symbol'])
+        # sentiment_result = {'score': 75, 'mentions': 50}
         
         if sentiment_result and sentiment_result['score'] > 60:
             # Update token_info with resolved token name from sentiment check

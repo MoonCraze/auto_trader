@@ -56,9 +56,9 @@ const Login: React.FC = () => {
               {/* Register Section */}
               <div className="mb-6">
                 <h2 className="text-xl font-semibold text-white mb-4">Create New Wallet</h2>
-                <p className="text-gray-400 text-sm mb-4">
+                {/* <p className="text-gray-400 text-sm mb-4">
                   Generate a synthetic wallet with a random SOL balance between 10-20 SOL
-                </p>
+                </p> */}
                 <button
                   onClick={handleRegister}
                   disabled={isLoading}
@@ -161,9 +161,9 @@ const Login: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-gray-500 text-sm mt-6">
+        {/* <p className="text-center text-gray-500 text-sm mt-6">
           Synthetic wallets are for demonstration purposes only
-        </p>
+        </p> */}
       </div>
     </div>
   );
