@@ -25,6 +25,11 @@ PORTFOLIO_MANAGERS = {}  # wallet_address -> PortfolioManager
 GLOBAL_MARKET_INDEX = []  # Shared market index data for idle display
 USER_LOCKS = {}  # wallet_address -> asyncio.Lock to serialize trades per user
 
+
+def user_has_active_or_pending(app_state):
+    """Return True if the user currently has a trade in progress."""
+    return any(s['status'] in ('Active', 'Pending') for s in app_state.get("trade_summaries", []))
+
 def get_default_state():
     """Return a fresh APP_STATE structure for a new user"""
     return {
@@ -344,57 +349,45 @@ async def process_sentiment_queue(raw_queue: asyncio.Queue, trade_queue: asyncio
             APP_STATE["trade_summaries"].append(new_summary)
             APP_STATE["processed_tokens"].add(token_info['address'])
             await broadcast_to_user(wallet_address, json.dumps({'type': 'TRADE_SUMMARY_UPDATE', 'data': {'summaries': APP_STATE["trade_summaries"]}}))
-        
-        sentiment_result = await check_sentiment(token_info['address'], token_info['symbol'])
-        # sentiment_result = {'score': 75, 'mentions': 50}
-        
-        if sentiment_result and sentiment_result['score'] > 60:
-            # Update token_info with resolved token name from sentiment check
-            if 'token_name' in sentiment_result:
-                token_info['symbol'] = sentiment_result['token_name']
-            print(f"Token {token_info['symbol']} passed sentiment. Pushing to trade queue for all users.")
-            await trade_queue.put((token_info, sentiment_result))
-        else:
-            print(f"Token {token_info['symbol']} failed sentiment screening.")
-            # Update all users' summaries
-            for wallet_address in list(USER_STATES.keys()):
-                APP_STATE = USER_STATES[wallet_address]
-                summary_to_update = next((s for s in APP_STATE["trade_summaries"] if s['token']['address'] == token_info['address']), None)
-                # Do not overwrite completed/active trades with a later failed screening result
-                if summary_to_update and summary_to_update['status'] == 'Screening':
-                    summary_to_update['status'] = 'Failed'
-                    if sentiment_result:
-                        if 'token_name' in sentiment_result:
-                            token_info['symbol'] = sentiment_result['token_name']
-                            summary_to_update['token']['symbol'] = sentiment_result['token_name']
-                        summary_to_update['sentiment_score'] = sentiment_result['score']
-                        summary_to_update['mention_count'] = sentiment_result['mentions']
-                    await broadcast_to_user(wallet_address, json.dumps({'type': 'TRADE_SUMMARY_UPDATE', 'data': {'summaries': APP_STATE["trade_summaries"]}}))
-        
-        print("Waiting 30 seconds before next sentiment check to respect rate limit...")
-        await asyncio.sleep(30)
+
+        # Defer sentiment: queue for just-in-time screening right before trading
+        print(f"Token {token_info['symbol']} queued for just-in-time sentiment screening.")
+        await trade_queue.put((token_info, None))
+        await asyncio.sleep(5)
 
 async def process_trade_queue(trade_queue: asyncio.Queue):
     """Process validated tokens and execute trades for all active users"""
     while True:
         token_info_tuple = await trade_queue.get()
-        token_info, sentiment_result = token_info_tuple
-        
-        # Execute trade for ALL active users
+        token_info, _ = token_info_tuple
+        pending_requeue = False
+
+        # Execute trade for ALL active users when they are free; run sentiment right before trading
         for wallet_address in list(USER_STATES.keys()):
             APP_STATE = USER_STATES[wallet_address]
             summary_to_update = next((s for s in APP_STATE["trade_summaries"] if s['token']['address'] == token_info['address']), None)
-            
-            if summary_to_update:
-                # Skip if this token is already Active/Pending/Finished/Failed for this user
-                if summary_to_update['status'] != 'Screening':
-                    continue
+
+            if not summary_to_update or summary_to_update['status'] != 'Screening':
+                continue
+
+            # If user is busy, defer and requeue this token
+            if user_has_active_or_pending(APP_STATE):
+                pending_requeue = True
+                continue
+
+            # Run sentiment just-in-time
+            sentiment_result = await check_sentiment(token_info['address'], token_info['symbol'])
+
+            if sentiment_result and sentiment_result.get('score', 0) > 60:
+                if 'token_name' in sentiment_result:
+                    token_info['symbol'] = sentiment_result['token_name']
+                    summary_to_update['token']['symbol'] = sentiment_result['token_name']
                 summary_to_update['status'] = 'Pending'
                 summary_to_update['sentiment_score'] = sentiment_result['score']
-                summary_to_update['mention_count'] = sentiment_result['mentions']
+                summary_to_update['mention_count'] = sentiment_result.get('mentions')
                 index = APP_STATE["trade_summaries"].index(summary_to_update)
                 await broadcast_to_user(wallet_address, json.dumps({'type': 'TRADE_SUMMARY_UPDATE', 'data': {'summaries': APP_STATE["trade_summaries"]}}))
-                
+
                 # Execute trade for this user with sentiment result (serialized per user)
                 async def run_user_trade():
                     lock = USER_LOCKS.setdefault(wallet_address, asyncio.Lock())
@@ -403,8 +396,19 @@ async def process_trade_queue(trade_queue: asyncio.Queue):
 
                 asyncio.create_task(run_user_trade())
             else:
-                print(f"Error: Could not find summary for validated token {token_info['symbol']} for wallet {wallet_address[:8]}...")
-        
+                summary_to_update['status'] = 'Failed'
+                if sentiment_result:
+                    if 'token_name' in sentiment_result:
+                        summary_to_update['token']['symbol'] = sentiment_result['token_name']
+                    summary_to_update['sentiment_score'] = sentiment_result.get('score')
+                    summary_to_update['mention_count'] = sentiment_result.get('mentions')
+                await broadcast_to_user(wallet_address, json.dumps({'type': 'TRADE_SUMMARY_UPDATE', 'data': {'summaries': APP_STATE["trade_summaries"]}}))
+
+        # If any user still needs this token after they free up, requeue it with a short backoff
+        if pending_requeue:
+            await asyncio.sleep(10)
+            await trade_queue.put((token_info, None))
+
         await asyncio.sleep(5)
 
 async def stream_background_data():
