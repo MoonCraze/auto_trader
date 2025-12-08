@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { WalletProvider, useWallet } from './context/WalletContext';
+import Login from './components/Login';
+import ProfilePage from './components/ProfilePage';
 import CandlestickChart from './components/CandlestickChart';
 import TransactionFeed from './components/TransactionFeed';
 import Card from './components/Card';
@@ -38,24 +41,24 @@ const StrategyPanel: React.FC<{ state: StrategyState | null; currentPrice: numbe
 
             {/* --- Column 2: Live Analysis --- */}
             <div className="space-y-3 border-l border-gray-700/50 pl-6">
-                 <p className="text-gray-400 font-semibold mb-2 border-b border-gray-700/50 pb-1">Live Analysis</p>
-                 <div className="flex justify-between">
+                <p className="text-gray-400 font-semibold mb-2 border-b border-gray-700/50 pb-1">Live Analysis</p>
+                <div className="flex justify-between">
                     <span className="text-gray-400">Peak Price:</span>
                     <span className="font-mono text-cyan-400">{state.highest_price_seen.toFixed(6)}</span>
-                 </div>
-                 <div className="flex justify-between">
+                </div>
+                <div className="flex justify-between">
                     <span className="text-gray-400">Drawdown:</span>
                     <span className={`font-mono ${drawdown > 0 ? 'text-red-400' : 'text-gray-400'}`}>{drawdown.toFixed(2)}%</span>
-                 </div>
+                </div>
             </div>
         </div>
     );
 };
 
 
-function App() {
-    // All state and WebSocket logic is correct and does not need changes.
-    const [isConnected, setIsConnected] = useState<boolean>(false);
+// Trading Dashboard Component (extracted from original App)
+const TradingDashboard: React.FC = () => {
+    const { isWsConnected, wsConnection, user } = useWallet();
     const [tradeSummaries, setTradeSummaries] = useState<TradeSummary[]>([]);
     const [activeTokenInfo, setActiveTokenInfo] = useState<TokenInfo | null>(null);
     const [initialCandles, setInitialCandles] = useState<Candle[] | null>(null);
@@ -66,34 +69,65 @@ function App() {
     const [strategyState, setStrategyState] = useState<StrategyState | null>(null);
     const [botTrades, setBotTrades] = useState<BotTrade[]>([]);
     const [marketTrades, setMarketTrades] = useState<MarketTrade[]>([]);
-    const initialCapital = 50.0;
+    const initialCapital = user?.initial_sol_balance ?? 50.0;
+    const chartBootstrappedRef = useRef(false);
 
     useEffect(() => {
-        // Use your production WebSocket URL here
-        const ws = new WebSocket('wss://effective-dollop-4665p97wrjqfq79w-8765.app.github.dev');
-        ws.onopen = () => setIsConnected(true);
-        ws.onclose = () => setIsConnected(false);
-        ws.onmessage = (event) => {
+        if (!wsConnection) return;
+
+        const handleMessage = (event: MessageEvent) => {
             const message = JSON.parse(event.data);
             switch (message.type) {
+                case 'AUTH_SUCCESS':
+                    console.log('Authenticated with WebSocket');
+                    break;
                 case 'NEW_TRADE_STARTING':
+                    // Reset live updates FIRST to prevent race conditions
+                    setLastCandle(null);
+                    setLastVolume(null);
+                    setMarketTrades([]);
+                    chartBootstrappedRef.current = false; // Reset bootstrap flag for new token
+                    
+                    // Then update token data
                     const tradeData = message.data;
+                    const newCandles = tradeData.candles || [];
+                    const newVolumes = tradeData.volumes || [];
+                    
+                    // Only set candles if we have valid data, otherwise set null to show loading
+                    setInitialCandles(newCandles.length > 0 ? newCandles : null);
+                    setInitialVolume(newVolumes.length > 0 ? newVolumes : null);
                     setActiveTokenInfo(tradeData.token_info);
-                    setInitialCandles(tradeData.candles || []);
-                    setInitialVolume(tradeData.volumes || []);
                     setBotTrades(tradeData.bot_trades || []);
                     setStrategyState(tradeData.strategy_state || null);
                     setPortfolio(tradeData.portfolio || null);
-                    setMarketTrades([]);
-                    setLastCandle(null);
-                    setLastVolume(null);
+                    
+                    // Mark as bootstrapped if we got data
+                    if (newCandles.length > 0) {
+                        chartBootstrappedRef.current = true;
+                    }
                     break;
                 case 'TRADE_SUMMARY_UPDATE':
                     setTradeSummaries(message.data.summaries);
                     break;
                 case 'UPDATE':
-                    if (message.data.candle) setLastCandle(message.data.candle);
-                    if (message.data.volume) setLastVolume(message.data.volume);
+                    // If this is the first candle after NEW_TRADE_STARTING with empty data, initialize the chart
+                    if (message.data.candle) {
+                        if (!chartBootstrappedRef.current) {
+                            // First candle - use it to bootstrap the chart
+                            setInitialCandles([message.data.candle]);
+                            if (message.data.volume) {
+                                setInitialVolume([message.data.volume]);
+                            }
+                            chartBootstrappedRef.current = true;
+                            // Don't set lastCandle yet - let the chart initialize first
+                        } else {
+                            // Subsequent candles - update normally
+                            setLastCandle(message.data.candle);
+                        }
+                    }
+                    if (message.data.volume && chartBootstrappedRef.current) {
+                        setLastVolume(message.data.volume);
+                    }
                     if (message.data.portfolio) setPortfolio(message.data.portfolio);
                     if (message.data.strategy_state) setStrategyState(message.data.strategy_state);
                     if (message.data.bot_trade) {
@@ -106,8 +140,12 @@ function App() {
                     break;
             }
         };
-        return () => ws.close();
-    }, []);
+
+        wsConnection.addEventListener('message', handleMessage);
+        return () => {
+            wsConnection.removeEventListener('message', handleMessage);
+        };
+    }, [wsConnection]);
 
     const tradePnl = portfolio?.trade_pnl ?? 0;
     const pnlColor = tradePnl >= 0 ? 'text-green-400' : 'text-red-400';
@@ -119,12 +157,13 @@ function App() {
 
     const activeAddress = activeTokenInfo?.address || null;
     const activeSymbol = activeTokenInfo?.symbol || "SYSTEM";
+    const isWaitingForFirstToken = !activeAddress || activeAddress === 'MARKET_INDEX';
     const activeTradeStatus = tradeSummaries.find(s => s.token.address === activeAddress)?.status ?? 'Inactive';
 
     return (
         <div className="bg-gray-900 text-white h-screen font-sans flex flex-col p-4">
             <header className="flex-shrink-0 flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
-                 <div>
+                <div>
                     <h1 className="text-2xl font-bold">{activeSymbol} / SOL</h1>
                     <p className="text-sm text-gray-400">Autonomous Trading Bot - Mission Control</p>
                 </div>
@@ -141,8 +180,8 @@ function App() {
                 <div className="flex items-center space-x-4">
                     <span className="text-sm text-gray-400">Trade Status: <span className="font-semibold text-yellow-400">{activeTradeStatus}</span></span>
                     <div className="flex items-center space-x-2">
-                        <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                        <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
+                        <div className={`w-3 h-3 rounded-full ${isWsConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                        <span>{isWsConnected ? 'Connected' : 'Disconnected'}</span>
                     </div>
                 </div>
             </header>
@@ -158,10 +197,10 @@ function App() {
                         </div>
                     </Card>
                     <Card title="Trade Queue" className="flex-grow min-h-0">
-                       <TradeSummaryPanel summaries={tradeSummaries} activeTokenAddress={activeAddress} />
+                        <TradeSummaryPanel summaries={tradeSummaries} activeTokenAddress={activeAddress} />
                     </Card>
                 </div>
-                
+
                 <div className="flex-grow flex flex-col gap-4">
                     <div className="h-3/5 grid grid-cols-1 lg:grid-cols-4 gap-4">
                         <div className="lg:col-span-1 flex flex-col gap-4">
@@ -181,35 +220,128 @@ function App() {
                                                 <span className={`font-semibold ${trade.side === 'BUY' ? 'text-blue-400' : 'text-red-400'}`}>{trade.side}</span>
                                                 <span className="text-gray-400 font-mono">@ {trade.price.toFixed(6)}</span>
                                             </div>
-                                            <div className="text-white font-mono text-right">{trade.token_amount.toFixed(2)} {activeSymbol?.replace('COIN','')} <span className="text-gray-500">({trade.sol_amount.toFixed(4)} SOL)</span></div>
+                                            <div className="text-white font-mono text-right">{trade.token_amount.toFixed(2)} {activeSymbol ? activeSymbol.replace('COIN','') : ''} <span className="text-gray-500">({trade.sol_amount.toFixed(4)} SOL)</span></div>
                                         </li>
                                     ))}
                                 </ul>
                             </Card>
                         </div>
                         <div className="lg:col-span-3 bg-gray-800/50 rounded-lg p-2">
-                             <CandlestickChart 
-                                key={activeAddress || 'market-index'} 
-                                initialData={initialCandles} 
-                                initialVolume={initialVolume} 
-                                update={lastCandle}
-                                volumeUpdate={lastVolume}
-                                botTrades={botTrades} 
-                                strategyState={strategyState}
-                            />
+                            {isWaitingForFirstToken ? (
+                                <div className="flex items-center justify-center h-full rounded-lg border border-dashed border-indigo-500/40 bg-slate-800/60 text-center px-6">
+                                    <div className="space-y-3 max-w-md">
+                                        <p className="text-lg font-semibold text-indigo-200">Awaiting first token signal</p>
+                                        <p className="text-sm text-gray-400">We’ll light up the chart as soon as a screened token passes sentiment and risk checks. Sit tight! signals are on their way.</p>
+                                    </div>
+                                </div>
+                            ) : (initialCandles !== null && initialCandles.length > 0) ? (
+                                <CandlestickChart
+                                    key={activeAddress || 'market-index'}
+                                    initialData={initialCandles}
+                                    initialVolume={initialVolume}
+                                    update={lastCandle}
+                                    volumeUpdate={lastVolume}
+                                    botTrades={botTrades}
+                                    strategyState={strategyState}
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center h-full">
+                                    <div className="text-center">
+                                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+                                        <p className="text-gray-400">Loading chart data...</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="h-2/5 grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Card title="Live Trade Analysis">
-                           <StrategyPanel state={strategyState} currentPrice={currentPrice} />
+                            <StrategyPanel state={strategyState} currentPrice={currentPrice} />
                         </Card>
                         <Card title="Live Transactions">
-                           <TransactionFeed trades={marketTrades} />
+                            <TransactionFeed trades={marketTrades} />
                         </Card>
                     </div>
                 </div>
             </main>
         </div>
+    );
+};
+
+// Main App Component with Navigation
+const AppContent: React.FC = () => {
+    const { isAuthenticated, user, logout } = useWallet();
+    const [currentPage, setCurrentPage] = useState<'dashboard' | 'profile'>('dashboard');
+
+    if (!isAuthenticated) {
+        return <Login />;
+    }
+
+    return (
+        <div className="h-screen flex flex-col bg-gray-900">
+            {/* Top Navigation Bar */}
+            <nav className="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                    <h1 className="text-xl font-bold text-white">Auto Trader Bot</h1>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setCurrentPage('dashboard')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                                currentPage === 'dashboard'
+                                    ? 'bg-purple-600 text-white'
+                                    : 'text-gray-400 hover:text-white hover:bg-slate-700'
+                            }`}
+                        >
+                            Trading Dashboard
+                        </button>
+                        <button
+                            onClick={() => setCurrentPage('profile')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                                currentPage === 'profile'
+                                    ? 'bg-purple-600 text-white'
+                                    : 'text-gray-400 hover:text-white hover:bg-slate-700'
+                            }`}
+                        >
+                            Profile / Wallet
+                        </button>
+                    </div>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="text-right">
+                        <div className="text-xs text-gray-400">Wallet</div>
+                        <div className="text-sm font-mono text-white">
+                            {user?.wallet_address.slice(0, 6)}...{user?.wallet_address.slice(-4)}
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-xs text-gray-400">Balance</div>
+                        <div className="text-sm font-semibold text-green-400">
+                            {user?.initial_sol_balance.toFixed(4)} SOL
+                        </div>
+                    </div>
+                    <button
+                        onClick={logout}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                        Logout
+                    </button>
+                </div>
+            </nav>
+
+            {/* Page Content */}
+            <div className="flex-1 overflow-hidden">
+                {currentPage === 'dashboard' ? <TradingDashboard /> : <ProfilePage />}
+            </div>
+        </div>
+    );
+};
+
+// Root App Component with Provider
+function App() {
+    return (
+        <WalletProvider>
+            <AppContent />
+        </WalletProvider>
     );
 }
 

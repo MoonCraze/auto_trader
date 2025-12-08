@@ -62,3 +62,66 @@ export interface StrategyState {
     take_profit_tiers: [number, number][];
     highest_price_seen: number;
 }
+
+// Authentication & User Types
+export interface User {
+    wallet_address: string;
+    initial_sol_balance: number;
+    created_at: string;
+}
+
+export interface AuthState {
+    isAuthenticated: boolean;
+    user: User | null;
+    walletAddress: string | null;
+}
+
+// Historical Trade Types
+export interface HistoricalTrade {
+    id: number;
+    token_symbol: string;
+    token_address: string;
+    status: 'active' | 'finished' | 'failed';
+    entry_time: string;
+    entry_price: number;
+    quantity: number;
+    sol_invested: number;
+    exit_time: string | null;
+    exit_price: number | null;
+    sol_returned: number | null;
+    pnl_sol: number | null;
+    pnl_percent: number | null;
+    exit_reason: string | null;
+}
+
+// Analytics Types
+export interface TokenAnalytics {
+    token_symbol: string;
+    token_address: string;
+    total_trades: number;
+    wins: number;
+    losses: number;
+    win_rate: number;
+    total_invested: number;
+    total_returned: number;
+    net_pnl: number;
+    avg_pnl_percent: number;
+    best_trade_pnl: number;
+    worst_trade_pnl: number;
+}
+
+export interface OverallAnalytics {
+    total_trades: number;
+    active_trades: number;
+    finished_trades: number;
+    total_wins: number;
+    total_losses: number;
+    win_rate: number;
+    total_volume_sol: number;
+    total_pnl_sol: number;
+    avg_trade_size_sol: number;
+    avg_pnl_per_trade: number;
+    largest_win: number;
+    largest_loss: number;
+    unique_tokens_traded: number;
+}

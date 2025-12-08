@@ -1,1 +1,25 @@
 @import "tailwindcss";
+
+/* Subtle dark scrollbar to match dashboard theme */
+.themed-scrollbar {
+	scrollbar-width: thin;
+	scrollbar-color: #4b5563 #111827;
+}
+
+.themed-scrollbar::-webkit-scrollbar {
+	width: 8px;
+}
+
+.themed-scrollbar::-webkit-scrollbar-track {
+	background: #111827;
+	border-radius: 9999px;
+}
+
+.themed-scrollbar::-webkit-scrollbar-thumb {
+	background: linear-gradient(180deg, #4f46e5, #06b6d4);
+	border-radius: 9999px;
+}
+
+.themed-scrollbar::-webkit-scrollbar-thumb:hover {
+	background: linear-gradient(180deg, #4338ca, #0891b2);
+}
