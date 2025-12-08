@@ -1,6 +1,13 @@
+# Database Configuration
+DATABASE_URL = "sqlite:///./trading_bot.db"  # SQLite for simplicity, can switch to PostgreSQL
+
 # Portfolio and Risk Management
 INITIAL_CAPITAL_SOL = 50.0
 RISK_PER_TRADE_PERCENT = 0.02  # 2% of total capital per trade
+
+# Synthetic Wallet Configuration
+MIN_SYNTHETIC_SOL = 10.0
+MAX_SYNTHETIC_SOL = 20.0
 
 # Strategy Parameters: Tiered Take-Profits
 # Format: (profit_percentage_target, portion_to_sell)

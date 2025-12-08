@@ -26,9 +26,12 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ initialData, initia
     const chartRef = useRef<IChartApi | null>(null);
     const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
     const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+    const lastCandleTimeRef = useRef<number | null>(null);
+    const lastVolumeTimeRef = useRef<number | null>(null);
     
     // <<< THE DEFINITIVE FIX: We will manage lines within effects, not in top-level refs.
     const stopLossLineRef = useRef<IPriceLine | null>(null);
+    const priceLinesRef = useRef<IPriceLine[]>([]);
 
     // This effect runs ONCE when the component mounts (thanks to the key prop).
     // It is responsible for all initial setup.
@@ -49,8 +52,14 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ initialData, initia
         candleSeriesRef.current = candleSeries;
         volumeSeriesRef.current = volumeSeries;
 
-        if (initialData) candleSeries.setData(initialData);
-        if (initialVolume) volumeSeries.setData(initialVolume);
+        if (initialData && initialData.length > 0) {
+            candleSeries.setData(initialData);
+            lastCandleTimeRef.current = initialData[initialData.length - 1].time as number;
+        }
+        if (initialVolume && initialVolume.length > 0) {
+            volumeSeries.setData(initialVolume);
+            lastVolumeTimeRef.current = initialVolume[initialVolume.length - 1].time as number;
+        }
         
         // The cleanup function is called when the component is destroyed.
         return () => {
@@ -61,14 +70,20 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ initialData, initia
     // This effect is ONLY for live candle updates.
     useEffect(() => {
         if (update && candleSeriesRef.current) {
+            const updateTime = update.time as number;
+            if (lastCandleTimeRef.current !== null && updateTime <= lastCandleTimeRef.current) return; // Ignore stale/duplicate updates
             candleSeriesRef.current.update(update);
+            lastCandleTimeRef.current = updateTime;
         }
     }, [update]);
 
     // This effect is ONLY for live volume updates.
     useEffect(() => {
         if (volumeUpdate && volumeSeriesRef.current) {
+            const updateTime = volumeUpdate.time as number;
+            if (lastVolumeTimeRef.current !== null && updateTime <= lastVolumeTimeRef.current) return;
             volumeSeriesRef.current.update(volumeUpdate);
+            lastVolumeTimeRef.current = updateTime;
         }
     }, [volumeUpdate]);
     
@@ -85,20 +100,32 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ initialData, initia
         const series = candleSeriesRef.current;
         if (!strategyState || !series) return;
 
-        // Draw static lines for Entry and Take-Profits
-        series.createPriceLine({ price: strategyState.entry_price, color: '#2196F3', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'ENTRY' });
+        // Clear old lines to prevent duplicates
+        priceLinesRef.current.forEach(line => series.removePriceLine(line));
+        priceLinesRef.current = [];
+        stopLossLineRef.current = null;
+
+        // Draw Entry
+        const entryLine = series.createPriceLine({ price: strategyState.entry_price, color: '#2196F3', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'ENTRY' });
+        priceLinesRef.current.push(entryLine);
+
+        // Draw Take-Profits
         strategyState.take_profit_tiers.forEach(([targetPercent], i) => {
             const targetPrice = strategyState.entry_price * (1 + targetPercent);
-            series.createPriceLine({ price: targetPrice, color: '#4CAF50', lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: `TP ${i + 1}` });
+            const tpLine = series.createPriceLine({ price: targetPrice, color: '#4CAF50', lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: `TP ${i + 1}` });
+            priceLinesRef.current.push(tpLine);
         });
         
-        // For the dynamic stop-loss line, we create it and store it in our ref.
+        // Draw Stop-Loss
         const slLine = series.createPriceLine({ price: strategyState.stop_loss_price, color: '#FFEB3B', lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'STOP' });
         stopLossLineRef.current = slLine;
+        priceLinesRef.current.push(slLine);
 
-        // This cleanup function runs when the strategyState prop changes (i.e., when the component is about to be re-rendered for a new trade, though the `key` prop will destroy it first). This ensures old lines are removed.
+        // Cleanup removes all created lines
         return () => {
-            series.removePriceLine(slLine);
+            priceLinesRef.current.forEach(line => series.removePriceLine(line));
+            priceLinesRef.current = [];
+            stopLossLineRef.current = null;
         }
 
     }, [strategyState?.entry_price]); // Depend only on entry_price to draw static lines once.
