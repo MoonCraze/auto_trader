@@ -157,6 +157,7 @@ const TradingDashboard: React.FC = () => {
 
     const activeAddress = activeTokenInfo?.address || null;
     const activeSymbol = activeTokenInfo?.symbol || "SYSTEM";
+    const isWaitingForFirstToken = !activeAddress || activeAddress === 'MARKET_INDEX';
     const activeTradeStatus = tradeSummaries.find(s => s.token.address === activeAddress)?.status ?? 'Inactive';
 
     return (
@@ -226,7 +227,14 @@ const TradingDashboard: React.FC = () => {
                             </Card>
                         </div>
                         <div className="lg:col-span-3 bg-gray-800/50 rounded-lg p-2">
-                            {(initialCandles !== null && initialCandles.length > 0) ? (
+                            {isWaitingForFirstToken ? (
+                                <div className="flex items-center justify-center h-full rounded-lg border border-dashed border-indigo-500/40 bg-slate-800/60 text-center px-6">
+                                    <div className="space-y-3 max-w-md">
+                                        <p className="text-lg font-semibold text-indigo-200">Awaiting first token signal</p>
+                                        <p className="text-sm text-gray-400">We’ll light up the chart as soon as a screened token passes sentiment and risk checks. Sit tight! signals are on their way.</p>
+                                    </div>
+                                </div>
+                            ) : (initialCandles !== null && initialCandles.length > 0) ? (
                                 <CandlestickChart
                                     key={activeAddress || 'market-index'}
                                     initialData={initialCandles}

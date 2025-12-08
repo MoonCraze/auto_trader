@@ -360,7 +360,8 @@ async def process_sentiment_queue(raw_queue: asyncio.Queue, trade_queue: asyncio
             for wallet_address in list(USER_STATES.keys()):
                 APP_STATE = USER_STATES[wallet_address]
                 summary_to_update = next((s for s in APP_STATE["trade_summaries"] if s['token']['address'] == token_info['address']), None)
-                if summary_to_update:
+                # Do not overwrite completed/active trades with a later failed screening result
+                if summary_to_update and summary_to_update['status'] == 'Screening':
                     summary_to_update['status'] = 'Failed'
                     if sentiment_result:
                         if 'token_name' in sentiment_result:
