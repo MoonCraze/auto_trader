@@ -193,7 +193,7 @@ async def process_single_token(token_info, wallet_address, index, sentiment_resu
         return
 
     print(f"[{token_info['symbol']}] Entry signal found at index {entry_index}. Going live.")
-    # Remove historical data - start fresh from entry point
+    # Remove historical data - start fresh from entry point, but keep accumulating so UI can reload mid-trade
     initial_candles, initial_volumes = [], []
     sol_to_invest = pm.sol_balance * config.RISK_PER_TRADE_PERCENT
     
@@ -252,6 +252,14 @@ async def process_single_token(token_info, wallet_address, index, sentiment_resu
         }
         market_trade = {'side': 'BUY' if random.random() > 0.5 else 'SELL', 'sol_amount': round(random.uniform(0.05, 1.5), 4), 'price': round(current_price, 6), 'timestamp': datetime.now(timezone.utc).isoformat()} if random.random() > 0.6 else None
         candle, volume = format_candle_and_volume(row)
+        # Persist candles/volumes so reconnecting clients get full intratrade history instead of a blank chart
+        APP_STATE["initial_candles"].append(candle)
+        APP_STATE["initial_volumes"].append(volume)
+        # Keep a reasonable history window to avoid unbounded growth
+        if len(APP_STATE["initial_candles"]) > 1000:
+            APP_STATE["initial_candles"] = APP_STATE["initial_candles"][-1000:]
+            APP_STATE["initial_volumes"] = APP_STATE["initial_volumes"][-1000:]
+
         update_message = {'type': 'UPDATE', 'data': {'candle': candle, 'volume': volume, 'portfolio': APP_STATE["portfolio"], 'strategy_state': APP_STATE["strategy_state"], 'bot_trade': bot_trade_event, 'market_trade': market_trade}}
         await broadcast_to_user(wallet_address, json.dumps(update_message))
         if token_info['address'] not in pm.positions: break

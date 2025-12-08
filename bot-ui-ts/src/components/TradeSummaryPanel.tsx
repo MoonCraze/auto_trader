@@ -28,38 +28,40 @@ const TradeSummaryPanel: React.FC<TradeSummaryPanelProps> = ({ summaries, active
     }
 
     return (
-        <ul className="space-y-3">
-            {summaries.map((summary) => (
+        <div className="h-full overflow-y-auto pr-1 themed-scrollbar">
+            <ul className="space-y-3 pb-1">
+                {summaries.map((summary) => (
                 // Filter out 'Failed' trades after 1 minute to keep the queue clean
                 // A more advanced implementation could use a timestamp
                 // if (summary.status === 'Failed') return null;
 
-                <li key={summary.token.address} className={`p-3 rounded-lg border-2 transition-all ${summary.token.address === activeTokenAddress ? 'border-blue-500 bg-gray-700/50' : 'border-transparent bg-gray-800/50'}`}>
-                    <div className="flex justify-between items-center mb-1">
-                        <span className="font-bold text-lg truncate pr-2">{summary.token.symbol}</span>
-                        <span className={getStatusChip(summary.status)}>{summary.status}</span>
-                    </div>
-                    <p className="text-xs text-gray-500 font-mono truncate">{summary.token.address}</p>
-                    
-                    {/* <<< NEW: Sentiment Score Display --- */}
-                    {summary.sentiment_score !== null && (
-                         <div className="text-xs mt-2 pt-2 border-t border-gray-700/50 flex justify-between items-center">
-                            <span className="text-gray-400">Sentiment:</span>
-                            <span className={`font-mono font-semibold ${getSentimentColor(summary.sentiment_score)}`}>
-                                {summary.sentiment_score.toFixed(0)}%
-                                <span className="text-gray-500 font-normal"> ({summary.mention_count} mentions)</span>
-                            </span>
+                    <li key={summary.token.address} className={`p-3 rounded-lg border-2 transition-all ${summary.token.address === activeTokenAddress ? 'border-blue-500 bg-gray-700/50' : 'border-transparent bg-gray-800/50'}`}>
+                        <div className="flex justify-between items-center mb-1">
+                            <span className="font-bold text-lg truncate pr-2">{summary.token.symbol}</span>
+                            <span className={getStatusChip(summary.status)}>{summary.status}</span>
                         </div>
-                    )}
+                        <p className="text-xs text-gray-500 font-mono truncate">{summary.token.address}</p>
+                        
+                        {/* <<< NEW: Sentiment Score Display --- */}
+                        {summary.sentiment_score !== null && (
+                             <div className="text-xs mt-2 pt-2 border-t border-gray-700/50 flex justify-between items-center">
+                                <span className="text-gray-400">Sentiment:</span>
+                                <span className={`font-mono font-semibold ${getSentimentColor(summary.sentiment_score)}`}>
+                                    {summary.sentiment_score.toFixed(0)}%
+                                    <span className="text-gray-500 font-normal"> ({summary.mention_count} mentions)</span>
+                                </span>
+                            </div>
+                        )}
 
-                    {summary.status === 'Finished' && (
-                        <div className={`text-right text-md font-mono mt-2 pt-2 border-t border-gray-700/50 ${summary.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                           <span className="text-sm text-gray-400">P&L:</span> {summary.pnl >= 0 ? `+${summary.pnl.toFixed(4)}` : summary.pnl.toFixed(4)} SOL
-                        </div>
-                    )}
-                </li>
-            ))}
-        </ul>
+                        {summary.status === 'Finished' && (
+                            <div className={`text-right text-md font-mono mt-2 pt-2 border-t border-gray-700/50 ${summary.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                               <span className="text-sm text-gray-400">P&L:</span> {summary.pnl >= 0 ? `+${summary.pnl.toFixed(4)}` : summary.pnl.toFixed(4)} SOL
+                            </div>
+                        )}
+                    </li>
+                ))}
+            </ul>
+        </div>
     );
 };
 
